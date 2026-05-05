@@ -30,15 +30,29 @@ type ParsedEmote struct {
 	URL  string // CDN URL: https://files.kick.com/emotes/{id}/fullsize
 }
 
+// MessagePart is one segment of a parsed chat message — either plain text
+// or an emote. Exactly one of Text or Emote is set.
+type MessagePart struct {
+	Text  string       // plain text segment; empty when Emote is set
+	Emote *ParsedEmote // nil when Text is set
+}
+
 // ChatMessage is a single chat message received from Kick.
 type ChatMessage struct {
 	ID         string        `json:"id"`
 	ChatroomID int           `json:"chatroom_id"`
-	Content    string        `json:"content"`  // raw, may contain [emote:id:name] tokens
+	Content    string        `json:"content"` // raw, may contain [emote:id:name] tokens
 	Type       string        `json:"type"`
 	CreatedAt  time.Time     `json:"created_at"`
 	Sender     Sender        `json:"sender"`
-	Emotes     []ParsedEmote // populated after parsing Content
+	Emotes     []ParsedEmote // unique emotes present in Content
+	Parts      []MessagePart // Content split into text+emote segments, ready to render
+}
+
+// pusherPong is sent in response to a pusher:ping event.
+type pusherPong struct {
+	Event string         `json:"event"`
+	Data  map[string]any `json:"data"`
 }
 
 // raw Pusher envelope — inner Data is a JSON string (double-encoded)

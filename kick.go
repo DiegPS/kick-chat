@@ -206,6 +206,14 @@ func (c *Client) readLoop() {
 			continue
 		}
 
+		if env.Event == "pusher:ping" {
+			pong, _ := json.Marshal(pusherPong{Event: "pusher:pong", Data: map[string]any{}})
+			c.mu.Lock()
+			c.ws.WriteMessage(websocket.TextMessage, pong)
+			c.mu.Unlock()
+			continue
+		}
+
 		if env.Event != "App\\Events\\ChatMessageEvent" {
 			continue
 		}
@@ -216,6 +224,7 @@ func (c *Client) readLoop() {
 		}
 
 		msg.Emotes = ParseEmotes(msg.Content)
+		msg.Parts = ParseMessage(msg.Content)
 
 		select {
 		case c.msgCh <- msg:
