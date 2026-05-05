@@ -35,11 +35,17 @@ func main() {
     }
 
     for msg := range client.Messages() {
-        fmt.Printf("[%s] %s: %s\n", msg.CreatedAt.Format("15:04:05"), msg.Sender.Username, msg.Content)
+        fmt.Printf("[%s] %s:\n", msg.CreatedAt.Format("15:04:05"), msg.Sender.Username)
 
-        for _, e := range msg.Emotes {
-            fmt.Printf("  emote: %s → %s\n", e.Name, e.URL)
+        // Render message parts in order (text and emotes interleaved)
+        for _, part := range msg.Parts {
+            if part.Emote != nil {
+                fmt.Printf("  [emote: %s] ", part.Emote.Name)
+            } else {
+                fmt.Printf("  %s", part.Text)
+            }
         }
+        fmt.Println()
     }
 }
 ```
@@ -68,7 +74,8 @@ type ChatMessage struct {
     Type       string
     CreatedAt  time.Time
     Sender     Sender
-    Emotes     []ParsedEmote // parsed from Content automatically
+    Emotes     []ParsedEmote // unique emotes present in Content (deduplicated)
+    Parts      []MessagePart // Content split into text+emote segments, ready to render
 }
 
 type Sender struct {
@@ -94,6 +101,11 @@ type ParsedEmote struct {
     Name string
     URL  string // https://files.kick.com/emotes/{id}/fullsize
 }
+
+type MessagePart struct {
+    Text  string       // plain text segment; empty when Emote is set
+    Emote *ParsedEmote // nil when Text is set
+}
 ```
 
 ### Utilities
@@ -102,12 +114,17 @@ type ParsedEmote struct {
 // Resolve a channel slug to its numeric chatroom ID (public API, no auth needed)
 func GetChatroomID(slug string) (int, error)
 
-// Extract emotes from raw message content
+// Extract unique emotes from raw message content
 func ParseEmotes(content string) []ParsedEmote
+
+// Split raw message content into ordered text+emote segments for direct rendering
+func ParseMessage(content string) []MessagePart
 ```
 
 ## Notes
 
 - Emotes in `Content` are encoded as `[emote:37225:KEKLEO]` — `ParsedEmote.URL` points to the Kick CDN.
+- `msg.Parts` is the recommended way to render messages — it preserves the original order of text and emotes.
+- `msg.Emotes` is useful when you only need to know which emotes are present (e.g. for pre-fetching or analytics), not their position in the text.
 - `Errors()` surfaces non-fatal errors (e.g. failed reconnect attempts). The client reconnects automatically on disconnect.
 - Cancel the context or call `Close()` to shut down cleanly.
